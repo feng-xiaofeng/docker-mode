@@ -1,0 +1,206 @@
+services:
+  trip-mysql:
+    container_name: trip-mysql
+    image: mysql:8.0.37
+    restart: always
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/conf:/etc/mysql/conf.d
+      - ./mysql/logs:/logs
+      - ./mysql/data:/var/lib/mysql
+    command:
+      - 'mysqld'
+      - '--innodb-buffer-pool-size=80M'
+      - '--character-set-server=utf8mb4'
+      - '--collation-server=utf8mb4_0900_ai_ci'
+      - '--default-time-zone=+8:00'
+      - '--lower_case_table_names=1'
+    environment:
+      MYSQL_DATABASE: "trip_mode"
+      MYSQL_ROOT_PASSWORD: "mm2580AA"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -pmm2580AA"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+  trip-redis:
+    container_name: trip-redis
+    image: redis:6.2.6-v
+    build:
+      context: ./redis
+      dockerfile: Dockerfile
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/conf/redis.config:/etc/redis/redis.config
+      - ./redis/data:/var/lib/redis
+      - ./redis/logs:/logs
+    entrypoint:
+      - "redis-server"
+      - "/redis/conf/redis.config"
+    links:
+      - trip-mysql
+  trip-websocket:
+    container_name: trip-websocket
+    image: trip-websocket:v.1
+    build:
+      context: ./trip/WebSocket
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    depends_on:
+      - trip-mysql
+      - trip-redis   
+    links:
+      - trip-mysql
+      - trip-redis
+  trip-home-page:
+    container_name: trip-home-page
+    image: trip-home-page:v.1
+    build:
+      context: ./trip/Home_page
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      trip-mysql:
+        condition: service_healthy
+    links:
+      - trip-mysql
+      - trip-redis
+  trip-goods:
+    container_name: trip-goods
+    image: trip-goods:v.1
+    build:
+      context: ./trip/Goods
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    depends_on:
+      - trip-home-page
+      - trip-mysql   
+    links:
+      - trip-mysql
+  trip-get-user-to:
+    container_name: trip-get-user-to
+    image: trip-get-user-to:v.1
+    build:
+      context: ./trip/Get_user_to
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+  trip-goods-type:
+    container_name: trip-goods-type
+    image: trip-goods-type:v.1
+    build:
+      context: ./trip/Goods_type
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+      - trip-redis
+  trip-order:
+    container_name: trip-order
+    image: trip-order:v.1
+    build:
+      context: ./trip/Order
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8080"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+  trip-purchase:
+    container_name: trip-purchase
+    image: trip-purchase:v.1
+    build:
+      context: ./trip/Purchase
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8080"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+  trip-school:
+    container_name: trip-school
+    image: trip-school:v.1
+    build:
+      context: ./trip/School
+      dockerfile: Dockerfile
+    ports:
+      - "8086:8089"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+  trip-users:
+    container_name: trip-users
+    image: trip-users:v.1
+    build:
+      context: ./trip/Users
+      dockerfile: Dockerfile
+    ports:
+      - "8087:8080"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+      - trip-redis
+  trip-release:
+    container_name: trip-release
+    image: trip-release:v.1
+    build:
+      context: ./trip/Release
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8080"
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+      - trip-redis
+  images_api:
+    container_name: images_api
+    image: images_api:v.1
+    build:
+      context: ./Images_api
+      dockerfile: Dockerfile
+    ports:
+      - "9001:8080"
+    volumes:
+      - ./images/avatar_images:/images/avatar_images
+      - ./images/goods_images:/images/goods_images
+    depends_on:
+      - trip-mysql   
+    links:
+      - trip-mysql
+  go_server:
+    container_name: go_server
+    image: go_server:v.1
+    build:
+      context: ./trip/Go_server
+      dockerfile: Dockerfile
+    ports:
+      - "80:8080"
+    volumes:
+      - ./trip/Go_server/static:/static
+      - ./trip/Go_server/templates:/templates
+    depends_on:
+      trip-mysql:
+        condition: service_healthy
+    links:
+      - trip-mysql
+      - trip-redis
